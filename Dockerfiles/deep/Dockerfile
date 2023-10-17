@@ -1,31 +1,17 @@
-# Copyright 2017 Neural Networks and Deep Learning lab, MIPT
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-FROM python:3.7-slim-stretch
+FROM python:3.8-slim-bullseye
 
 ARG COMMIT=master
 
 EXPOSE 5000
-
+RUN mkdir /base
+RUN cd /base
 WORKDIR /base
-
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
         git \
         locales && \
-    printf '%s\n%s\n' 'en_US.UTF-8 UTF-8' 'ru_RU.UTF-8 UTF-8' >> /etc/locale.gen && \
+    printf '%s\n%s\n%s\n' 'en_US.UTF-8 UTF-8' 'ru_RU.UTF-8 UTF-8' 'fa_IR.UTF-8 UTF-8'>> /etc/locale.gen && \
     locale-gen && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
 	rm -rf /var/lib/apt/lists/* && \
@@ -36,15 +22,16 @@ RUN apt-get update && \
 
 ENV PATH=/base/venv/bin:$PATH
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US.UTF-8' LC_ALL='en_US.UTF-8'
+RUN git clone https://github.com/habibzadeh/DeepPavlov /base/DeepPavlov
+RUN cd /base/DeepPavlov
+WORKDIR /base/DeepPavlov
+RUN git pull
+RUN /base/venv/bin/pip install -U numpy==1.23.5 Cython
+RUN /base/venv/bin/python /base/DeepPavlov/setup.py develop
+RUN /base/venv/bin/python -c "import deeppavlov.models"
+RUN rm -rf /root/.cache
 
-RUN git clone https://github.com/deepmipt/DeepPavlov.git && \
-    cd DeepPavlov && \
-    git checkout $COMMIT && \
-    python setup.py develop && \
-    python -c 'import deeppavlov.models' && \
-    rm -rf /root/.cache
-
-RUN pip install email-validator
+RUN /base/venv/bin/pip install email-validator
 
 RUN mkdir /base/config
 RUN mkdir /base/train
@@ -54,7 +41,7 @@ COPY train/file.csv /base/train/file.csv
 
 RUN mkdir -p /root/.deeppavlov
 
-RUN python -m deeppavlov install /base/config/tfidf_logreg_en_faq.json
-RUN python -m deeppavlov download /base/config/tfidf_logreg_en_faq.json
-RUN python -m deeppavlov train /base/config/tfidf_logreg_en_faq.json
-CMD python -m deeppavlov riseapi /base/config/tfidf_logreg_en_faq.json
+RUN /base/venv/bin/python -m deeppavlov install /base/config/tfidf_logreg_en_faq.json
+RUN /base/venv/bin/python -m deeppavlov download /base/config/tfidf_logreg_en_faq.json
+RUN /base/venv/bin/python -m deeppavlov train /base/config/tfidf_logreg_en_faq.json
+CMD /base/venv/bin/python -m deeppavlov riseapi /base/config/tfidf_logreg_en_faq.json
